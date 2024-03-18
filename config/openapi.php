@@ -6,6 +6,8 @@ return [
 
         'default' => [
 
+            'router_collector' => 'Vyuldashev\\LaravelOpenApi\\RouterCollector',
+
             'info' => [
                 'title' => config('app.name'),
                 'description' => null,

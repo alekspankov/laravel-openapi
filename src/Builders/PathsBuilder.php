@@ -11,14 +11,17 @@ use Vyuldashev\LaravelOpenApi\Attributes\Collection as CollectionAttribute;
 use Vyuldashev\LaravelOpenApi\Builders\Paths\OperationsBuilder;
 use Vyuldashev\LaravelOpenApi\Contracts\PathMiddleware;
 use Vyuldashev\LaravelOpenApi\Generator;
+use Vyuldashev\LaravelOpenApi\Interfaces\RouterCollectorInterface;
 use Vyuldashev\LaravelOpenApi\RouteInformation;
+use Vyuldashev\LaravelOpenApi\RouterCollector;
 
 class PathsBuilder
 {
     protected OperationsBuilder $operationsBuilder;
 
     public function __construct(
-        OperationsBuilder $operationsBuilder
+        OperationsBuilder $operationsBuilder,
+        RouterCollectorInterface $routerCollector
     ) {
         $this->operationsBuilder = $operationsBuilder;
     }
@@ -32,16 +35,17 @@ class PathsBuilder
         string $collection,
         array $middlewares
     ): array {
-        return $this->routes()
+        $collectorClass = $this->getRouteCollectorClass($collection);
+        return $collectorClass->routes()
             ->filter(static function (RouteInformation $routeInformation) use ($collection) {
                 /** @var CollectionAttribute|null $collectionAttribute */
                 $collectionAttribute = collect()
                     ->merge($routeInformation->controllerAttributes)
                     ->merge($routeInformation->actionAttributes)
-                    ->first(static fn (object $item) => $item instanceof CollectionAttribute);
+                    ->first(static fn(object $item) => $item instanceof CollectionAttribute);
 
                 return
-                    (! $collectionAttribute && $collection === Generator::COLLECTION_DEFAULT) ||
+                    (!$collectionAttribute && $collection === Generator::COLLECTION_DEFAULT) ||
                     ($collectionAttribute && in_array($collection, $collectionAttribute->name, true));
             })
             ->map(static function (RouteInformation $item) use ($middlewares) {
@@ -51,7 +55,7 @@ class PathsBuilder
 
                 return $item;
             })
-            ->groupBy(static fn (RouteInformation $routeInformation) => $routeInformation->uri)
+            ->groupBy(static fn(RouteInformation $routeInformation) => $routeInformation->uri)
             ->map(function (Collection $routes, $uri) {
                 $pathItem = PathItem::create()->route($uri);
 
@@ -70,20 +74,14 @@ class PathsBuilder
             ->toArray();
     }
 
-    protected function routes(): Collection
+    /**
+     * @param  string  $collection
+     * @return RouterCollectorInterface
+     */
+    private function getRouteCollectorClass($collection): RouterCollectorInterface
     {
-        /** @noinspection CollectFunctionInCollectionInspection */
-        return collect(app(Router::class)->getRoutes())
-            ->filter(static fn (Route $route) => $route->getActionName() !== 'Closure')
-            ->map(static fn (Route $route) => RouteInformation::createFromRoute($route))
-            ->filter(static function (RouteInformation $route) {
-                $pathItem = $route->controllerAttributes
-                    ->first(static fn (object $attribute) => $attribute instanceof Attributes\PathItem);
-
-                $operation = $route->actionAttributes
-                    ->first(static fn (object $attribute) => $attribute instanceof Attributes\Operation);
-
-                return $pathItem && $operation;
-            });
+        $collectorClass = config("openapi.collections.${collection}.router_collector");
+        return (new $collectorClass());
     }
+
 }

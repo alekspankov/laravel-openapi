@@ -9,8 +9,9 @@ use Vyuldashev\LaravelOpenApi\Builders\InfoBuilder;
 use Vyuldashev\LaravelOpenApi\Builders\PathsBuilder;
 use Vyuldashev\LaravelOpenApi\Builders\ServersBuilder;
 use Vyuldashev\LaravelOpenApi\Builders\TagsBuilder;
+use Vyuldashev\LaravelOpenApi\Interfaces\GeneratorInterface;
 
-class Generator
+class Generator implements GeneratorInterface
 {
     public string $version = OpenApi::OPENAPI_3_0_2;
 
